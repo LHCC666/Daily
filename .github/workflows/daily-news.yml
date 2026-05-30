@@ -22,11 +22,11 @@ jobs:
           python-version: '3.12'
 
       - name: 安装依赖
-        run: pip install -r "法学学习/daily-news/requirements.txt"
+        run: pip install -r daily-news/requirements.txt
 
       - name: 运行新闻简报
         env:
           SEND_KEY: ${{ secrets.SEND_KEY }}
         run: |
-          cd "法学学习/daily-news"
+          cd daily-news
           python daily_news.py
