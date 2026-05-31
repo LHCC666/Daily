@@ -1,29 +1,21 @@
 name: 每日新闻简报
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
 
 jobs:
   send-news:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-
     steps:
-      - name: 检出代码
-        uses: actions/checkout@v4
-
-      - name: 安装 Python
-        uses: actions/setup-python@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
-
-      - name: 安装依赖
-        run: pip install -r daily-news/requirements.txt
-
-      - name: 运行新闻简报
-        env:
+          python-version: "3.12"
+      - run: pip install -r daily-news/requirements.txt
+      - env:
           SEND_KEY: ${{ secrets.SEND_KEY }}
         run: |
           cd daily-news
