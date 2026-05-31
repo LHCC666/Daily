@@ -3,7 +3,7 @@ name: 每日新闻简报
 on:
   workflow_dispatch:
   schedule:
-    - cron: '7 0 * * *'
+    - cron: '*/15 * * * *'
 
 jobs:
   send-news:
