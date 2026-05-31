@@ -1,11 +1,9 @@
 name: 每日新闻简报
 
 on:
-  schedule:
-    # 北京时间每天早上 8:07（UTC 00:07）
-    - cron: '7 0 * * *'
-  # 允许手动触发（测试用）
   workflow_dispatch:
+  schedule:
+    - cron: '7 0 * * *'
 
 jobs:
   send-news:
