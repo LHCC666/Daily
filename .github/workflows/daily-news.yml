@@ -1,4 +1,4 @@
-name: 每日新闻简报
+name: Daily News
 
 on:
   schedule:
