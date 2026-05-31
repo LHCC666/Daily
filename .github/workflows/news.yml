@@ -1,4 +1,4 @@
-name: Daily News
+name: News
 
 on:
   schedule:
