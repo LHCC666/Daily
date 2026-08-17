@@ -9,7 +9,7 @@ import json
 import os
 import re
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict
 
 import feedparser
@@ -52,9 +52,8 @@ def load_config() -> dict:
 # ============================================================
 
 RSS_SOURCES: List[dict] = [
-    {"name": "新华网-时政", "url": "http://www.xinhuanet.com/politics/news_politics.xml", "category": "国内"},
-    {"name": "人民网-时政", "url": "http://www.people.com.cn/rss/politics.xml", "category": "国内"},
-    {"name": "环球网", "url": "https://www.huanqiu.com/rss/news.xml", "category": "国内"},
+    {"name": "中国新闻网-滚动", "url": "https://www.chinanews.com.cn/rss/scroll-news.xml", "category": "国内"},
+    {"name": "中国新闻网-要闻", "url": "https://www.chinanews.com.cn/rss/china.xml", "category": "国内"},
     {"name": "BBC 中文", "url": "https://feeds.bbci.co.uk/zhongwen/simp/rss.xml", "category": "国际"},
     {"name": "德国之声中文", "url": "https://rss.dw.com/rss/rss-chi-all", "category": "国际"},
     {"name": "FT 中文网", "url": "https://www.ftchinese.com/rss/feed", "category": "国际"},
@@ -71,6 +70,23 @@ WEB_SOURCES: List[dict] = [
 # 新闻抓取
 # ============================================================
 
+# 丢弃超过 48 小时的旧闻，防止停更源用旧条目撑满推送
+MAX_AGE_HOURS = 48
+
+
+def is_stale(entry) -> bool:
+    """判断 RSS 条目是否过期（超过 MAX_AGE_HOURS 小时）"""
+    published = entry.get("published_parsed") or entry.get("updated_parsed")
+    if not published:
+        return False  # 无日期字段，视为新鲜，不误伤
+    try:
+        pub_dt = datetime(*published[:6], tzinfo=timezone.utc)
+        age = datetime.now(timezone.utc) - pub_dt
+        return age.total_seconds() > MAX_AGE_HOURS * 3600
+    except Exception:
+        return False
+
+
 def fetch_rss(source: dict) -> List[dict]:
     """从单个 RSS 源抓取新闻"""
     items = []
@@ -80,6 +96,8 @@ def fetch_rss(source: dict) -> List[dict]:
             return items
 
         for entry in feed.entries[:15]:
+            if is_stale(entry):
+                continue
             title = entry.get("title", "").strip()
             link = entry.get("link", "")
             summary = entry.get("summary", "") or entry.get("description", "")
