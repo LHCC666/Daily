@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-step2: 用 DeepSeek API 批量生成前 5000 高频词的例句（英文 + 中文翻译）。
+step2: 用 DeepSeek API 生成前 example_count 词的例句（英文 + 中文翻译）。
+复用旧 examples_5000.json 里已有的例句，只新配缺失的（断点续传）。
 
 用法: 先设置环境变量 DEEPSEEK_API_KEY（或写 api_key.txt）
       py step2_examples.py [--batch 50]
@@ -13,8 +14,9 @@ import time
 import requests
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WORDS_JSON = os.path.join(SCRIPT_DIR, "words_15000.json")
-OUT_JSON = os.path.join(SCRIPT_DIR, "examples_5000.json")
+WORDS_JSON = os.path.join(SCRIPT_DIR, "words.json")
+OUT_JSON = os.path.join(SCRIPT_DIR, "examples.json")
+OLD_JSON = os.path.join(SCRIPT_DIR, "examples_5000.json")  # 旧例句，可复用
 
 API_URL = "https://api.deepseek.com/chat/completions"
 MODEL = "deepseek-chat"
@@ -34,16 +36,20 @@ def get_api_key():
 
 
 def load_existing():
+    """合并旧例句 + 新输出（断点续传）。"""
+    merged = {}
+    if os.path.exists(OLD_JSON):
+        with open(OLD_JSON, encoding="utf-8") as f:
+            merged.update(json.load(f))
     if os.path.exists(OUT_JSON):
         with open(OUT_JSON, encoding="utf-8") as f:
-            return json.load(f)
-    return {}
+            merged.update(json.load(f))
+    return merged
 
 
-def build_prompt(words):
-    """words: [(word, translation前40字), ...] 让模型生成准确例句"""
+def build_prompt(items):
     lines = []
-    for w, t in words:
+    for w, t in items:
         lines.append(f"- {w}（{t}）")
     wordlist = "\n".join(lines)
     return (
@@ -87,37 +93,37 @@ def main():
     with open(WORDS_JSON, encoding="utf-8") as f:
         data = json.load(f)
 
-    words = data["seg_high"]  # 前 5000
-    examples = load_existing()
-    todo = [w for w in words if w["word"] not in examples]
-    print(f"总词数 {len(words)}，已有 {len(examples)}，待生成 {len(todo)}")
+    words = data["words"][: data["example_count"]]  # 前 N 配例句
+    existing = load_existing()
+    todo = [w for w in words if w["word"] not in existing]
+    print(f"配例句范围 {len(words)} 词，已有 {len(existing)} 条（含复用），待新配 {len(todo)}")
+
+    out = {w: existing[w] for w in [x["word"] for x in words] if w in existing}
 
     for i in range(0, len(todo), batch_size):
         batch = todo[i:i + batch_size]
         items = [(w["word"], (w["translation"] or "")[:40].replace("\n", " ")) for w in batch]
         prompt = build_prompt(items)
-
         result = call_deepseek(api_key, prompt)
         if result:
             got = 0
             for w in batch:
                 word = w["word"]
                 if word in result and result[word]:
-                    examples[word] = result[word]
+                    out[word] = result[word]
                     got += 1
             print(f"  进度 {min(i + batch_size, len(todo))}/{len(todo)}  本批成功 {got}/{len(batch)}")
         else:
             print(f"  进度 {min(i + batch_size, len(todo))}/{len(todo)}  本批失败")
 
-        # 每批后保存（断点续传）
         with open(OUT_JSON, "w", encoding="utf-8") as f:
-            json.dump(examples, f, ensure_ascii=False, indent=1)
+            json.dump(out, f, ensure_ascii=False, indent=1)
         time.sleep(1)
 
-    missing = len(todo) - sum(1 for w in todo if w["word"] in examples)
-    print(f"\n✅ 完成: 共 {len(examples)} 条例句，缺失 {missing}")
+    missing = len(words) - len(out)
+    print(f"\n✅ 完成: 共 {len(out)} 条例句，缺失 {missing}")
     if missing:
-        print("缺失的词可再次运行本脚本补生成（断点续传）")
+        print("缺失的词可再次运行本脚本补生成")
 
 
 if __name__ == "__main__":

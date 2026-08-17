@@ -4,7 +4,9 @@ api_key.txt
 # 下载的原始词表与中间产物
 ecdict.csv
 _ecd/
+words.json
 words_15000.json
+examples.json
 examples_5000.json
 audio_fail.log
 

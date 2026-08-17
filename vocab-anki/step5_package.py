@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-step5: genanki 打包 15000 词牌库（3 子牌组 + 统一 5 字段笔记类型）。
+step5: genanki 打包「六级及以上词汇」牌库（单牌组 + 5 字段笔记类型）。
 
 字段: 单词 / 音标 / 释义 / 例句 / 语音
-背面条件渲染例句: {{#例句}}…{{/例句}}
+前 example_count 词配例句（条件渲染），其余仅释义。
 """
 import html
 import json
@@ -13,12 +13,13 @@ import re
 import genanki
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WORDS_JSON = os.path.join(SCRIPT_DIR, "words_15000.json")
-EXAMPLES_JSON = os.path.join(SCRIPT_DIR, "examples_5000.json")
+WORDS_JSON = os.path.join(SCRIPT_DIR, "words.json")
+EXAMPLES_JSON = os.path.join(SCRIPT_DIR, "examples.json")
 MEDIA_DIR = os.path.join(SCRIPT_DIR, "media")
-OUT_APKG = os.path.join(SCRIPT_DIR, "英语词汇15000.apkg")
+OUT_APKG = os.path.join(SCRIPT_DIR, "六级及以上词汇.apkg")
 
-MODEL_ID = 2026081801
+MODEL_ID = 2026081901
+DECK_ID = 2026081902
 ILLEGAL = re.compile(r'[\\/:*?"<>|\s]+')
 
 
@@ -34,7 +35,7 @@ def load_examples():
 
 
 def build_model():
-    model = genanki.Model(
+    return genanki.Model(
         MODEL_ID,
         "英语词汇卡片 (详细释义+例句+音频)",
         fields=[
@@ -71,7 +72,6 @@ def build_model():
             ".audio{font-size:16px;margin-top:14px}"
         ),
     )
-    return model
 
 
 def main():
@@ -79,50 +79,44 @@ def main():
         data = json.load(f)
     examples = load_examples()
 
+    words = data["words"]
+    example_count = data.get("example_count", 0)
+
     model = build_model()
+    deck = genanki.Deck(DECK_ID, "六级及以上词汇")
 
-    deck_specs = [
-        ("英语词汇::高频 1-5000", data["seg_high"], True),
-        ("英语词汇::中频 5001-10000", data["seg_mid"], False),
-        ("英语词汇::低频 10001-15000", data["seg_low"], False),
-    ]
-
-    decks = []
-    total = 0
     media_files = []
+    example_notes = 0
 
-    for i, (deck_name, words, has_example) in enumerate(deck_specs):
-        deck = genanki.Deck(2026081810 + i, deck_name)
-        for w in words:
-            word = w["word"]
-            phonetic = w.get("phonetic", "") or ""
-            translation = (w.get("translation", "") or "").strip()
-            fn = safe_name(word) + ".mp3"
-            sound = f"[sound:{fn}]"
+    for idx, w in enumerate(words):
+        word = w["word"]
+        phonetic = w.get("phonetic", "") or ""
+        translation = (w.get("translation", "") or "").strip()
+        fn = safe_name(word) + ".mp3"
+        sound = f"[sound:{fn}]"
 
-            example = ""
-            if has_example and word in examples:
-                example = examples[word]
+        example = ""
+        if idx < example_count and word in examples:
+            example = examples[word]
+            example_notes += 1
 
-            note = genanki.Note(
-                model=model,
-                fields=[word, phonetic, html.escape(translation), html.escape(example), sound],
-            )
-            deck.add_note(note)
-            total += 1
+        note = genanki.Note(
+            model=model,
+            fields=[word, phonetic, html.escape(translation), html.escape(example), sound],
+        )
+        deck.add_note(note)
 
-            mp3_path = os.path.join(MEDIA_DIR, fn)
-            if os.path.exists(mp3_path):
-                media_files.append(mp3_path)
+        mp3_path = os.path.join(MEDIA_DIR, fn)
+        if os.path.exists(mp3_path):
+            media_files.append(mp3_path)
 
-        decks.append(deck)
-
-    pkg = genanki.Package(decks)
+    pkg = genanki.Package(deck)
     pkg.media_files = media_files
     pkg.write_to_file(OUT_APKG)
 
     print(f"✅ 打包完成: {OUT_APKG}")
-    print(f"   总笔记数: {total}")
+    print(f"   总笔记数: {len(words)}")
+    print(f"   含例句: {example_notes}")
     print(f"   媒体文件数: {len(media_files)}")
     print(f"   文件大小: {os.path.getsize(OUT_APKG) / 1024 / 1024:.1f} MB")
 

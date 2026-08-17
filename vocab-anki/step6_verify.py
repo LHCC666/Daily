@@ -12,7 +12,7 @@ import zipfile
 import zstandard
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-APKG = os.path.join(SCRIPT_DIR, "英语词汇15000.apkg")
+APKG = os.path.join(SCRIPT_DIR, "六级及以上词汇.apkg")
 
 
 def read_collection(z: zipfile.ZipFile) -> sqlite3.Connection:
@@ -71,13 +71,11 @@ def main():
         media_count = sum(1 for n in names if n.isdigit())
         print(f"🎵 媒体文件数: {media_count}")
 
-        # 抽样：最高频 the 的完整卡片
-        row = con.execute(
-            "SELECT flds FROM notes WHERE flds LIKE ? LIMIT 1", ("the\x1f",)
-        ).fetchone()
+        # 抽样：第一张卡片的完整内容
+        row = con.execute("SELECT flds FROM notes LIMIT 1").fetchone()
         if row:
             parts = row[0].split("\x1f")
-            print("\n--- 样例卡片 (the) ---")
+            print("\n--- 样例卡片 ---")
             for i, name in enumerate(["单词", "音标", "释义", "例句", "语音"]):
                 print(f"  {name}: {parts[i][:80]}")
 

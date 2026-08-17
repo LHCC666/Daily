@@ -2,7 +2,7 @@
 """
 step3: edge-tts 批量生成美音 mp3（文件名 = 单词.mp3），支持断点续传 + 并发限流。
 
-用法: py step3_audio.py [--seg high|mid|low|all] [--concurrency 8]
+用法: py step3_audio.py [--concurrency 8]
 """
 import asyncio
 import json
@@ -13,7 +13,7 @@ import sys
 import edge_tts
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-WORDS_JSON = os.path.join(SCRIPT_DIR, "words_15000.json")
+WORDS_JSON = os.path.join(SCRIPT_DIR, "words.json")
 MEDIA_DIR = os.path.join(SCRIPT_DIR, "media")
 VOICE = "en-US-AriaNeural"
 
@@ -43,25 +43,17 @@ async def gen_one(word: str, sem: asyncio.Semaphore, retries: int = 3):
 
 
 async def main():
-    seg = "all"
     concurrency = 8
-    if "--seg" in sys.argv:
-        seg = sys.argv[sys.argv.index("--seg") + 1]
     if "--concurrency" in sys.argv:
         concurrency = int(sys.argv[sys.argv.index("--concurrency") + 1])
 
     with open(WORDS_JSON, encoding="utf-8") as f:
         data = json.load(f)
 
-    if seg == "all":
-        words = data["seg_high"] + data["seg_mid"] + data["seg_low"]
-    else:
-        words = data[f"seg_{seg}"]
-
+    words = data["words"]
     os.makedirs(MEDIA_DIR, exist_ok=True)
     sem = asyncio.Semaphore(concurrency)
 
-    # 预扫描已有文件，跳过
     todo = [w["word"] for w in words]
     done = sum(1 for w in todo if os.path.exists(os.path.join(MEDIA_DIR, safe_name(w) + ".mp3")))
     print(f"总词数 {len(todo)}，已有 {done}，待生成 {len(todo) - done}")
